@@ -7,7 +7,7 @@ import streamlit as st
        import os
 
        # Download model from Google Drive
-       model_url = "YOUR_GOOGLE_DRIVE_SHAREABLE_LINK"  # Replace with your link
+       model_url = "https://drive.google.com/file/d/1J7eINRPZjupWiuNa2qqXymH7rN6Ng3An/view?usp=drive_link"  # Replace with your link
        model_path = "saved_model/wafer_cnn_model.h5"
        if not os.path.exists(model_path):
            os.makedirs("saved_model", exist_ok=True)
