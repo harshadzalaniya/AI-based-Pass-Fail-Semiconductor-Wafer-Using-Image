@@ -37,13 +37,28 @@ def predict_wafer(image):
     return label, confidence
 
 st.title("Pass/Fail Semiconductor Wafer Classifier")
-st.write("Upload a wafer map image to classify it as Pass or Fail.")
-uploaded_file = st.file_uploader("Choose a wafer map image...", type=["png", "jpg", "jpeg"])
-if uploaded_file is not None:
+st.write("Capture a wafer map image with your camera or upload one to classify it as Pass or Fail.")
+
+# Camera input
+camera_image = st.camera_input("Take a photo of the wafer map")
+# File uploader
+uploaded_file = st.file_uploader("Or upload a wafer map image...", type=["png", "jpg", "jpeg"])
+
+if camera_image is not None:
+    image = Image.open(camera_image)
+    st.image(image, caption="Camera-Captured Wafer Map", use_column_width=True)
+    with st.spinner("Classifying..."):
+        label, confidence = predict_wafer(image)
+        st.write(f"**Prediction**: {label}")
+        st.write(f"**Confidence**: {confidence:.2%}")
+elif uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Wafer Map", use_column_width=True)
     with st.spinner("Classifying..."):
         label, confidence = predict_wafer(image)
         st.write(f"**Prediction**: {label}")
         st.write(f"**Confidence**: {confidence:.2%}")
-st.write("Note: This model was trained on the WM-811K dataset. 'Pass' indicates no defect pattern, while 'Fail' indicates a defect.")
+else:
+    st.info("Please capture a photo or upload an image to get started.")
+
+st.write("**Note**: This model was trained on the WM-811K dataset. 'Pass' indicates no defect pattern, while 'Fail' indicates a defect.")
