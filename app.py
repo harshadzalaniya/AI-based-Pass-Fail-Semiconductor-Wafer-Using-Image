@@ -5,6 +5,9 @@ import numpy as np
 from PIL import Image
 import os
 
+# Debug: Log start
+st.write("DEBUG: Starting app...")
+
 # Load the trained model
 model_path = "saved_model/wafer_cnn_model.h5"
 try:
@@ -18,22 +21,21 @@ except Exception as e:
     st.error(f"Error loading model: {str(e)}")
     st.stop()
 
+# Debug: Log model load complete
+st.write("DEBUG: Model load complete")
+
 def is_valid_wafer_image(image):
     img_array = np.array(image)
     if len(img_array.shape) == 3:
-        # Check if image is nearly grayscale (R, G, B channels similar)
         r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
         color_diff = np.mean(np.abs(r - g)) + np.mean(np.abs(g - b))
-        return color_diff < 20  # Relaxed threshold for grayscale-like images
-    return len(img_array.shape) == 2  # Grayscale is valid
+        return color_diff < 20
+    return len(img_array.shape) == 2
 
 def preprocess_image(image, img_size=(64, 64)):
-    # Convert to grayscale
-    img = image.convert('L')  # Convert to grayscale using PIL
+    img = image.convert('L')
     img = np.array(img)
-    # Stack to 3 channels for model compatibility
     img = np.stack([img] * 3, axis=-1)
-    # Resize and normalize
     img = cv2.resize(img, img_size, interpolation=cv2.INTER_NEAREST)
     img = img / 255.0
     img = np.expand_dims(img, axis=0)
@@ -41,4 +43,55 @@ def preprocess_image(image, img_size=(64, 64)):
 
 def predict_wafer(image):
     processed_img = preprocess_image(image)
-    prediction = model
+    prediction = model.predict(processed_img)[0][0]
+    if 0.2 < prediction < 0.8:
+        return "Uncertain", 0.0
+    label = "Pass" if prediction >= 0.5 else "Fail"
+    confidence = prediction if label == "Pass" else 1 - prediction
+    return label, confidence
+
+# Main UI
+with st.container():
+    st.title("Pass/Fail Semiconductor Wafer Classifier")
+    st.write("Capture or upload a wafer map image to classify it as Pass or Fail.")
+    st.write("**Tip**: Use clear wafer map images (grayscale, defect patterns). Images are converted to grayscale for classification.")
+    # Debug: Log UI rendering
+    st.write("DEBUG: UI rendered")
+
+    # Camera input
+    camera_image = st.camera_input("Take a photo of the wafer map")
+    # File uploader
+    uploaded_file = st.file_uploader("Or upload a wafer map image...", type=["png", "jpg", "jpeg"])
+
+    if camera_image is not None:
+        image = Image.open(camera_image)
+        if not is_valid_wafer_image(image):
+            st.warning("Image converted to grayscale, but ensure it’s a clear wafer map for best results.")
+        with st.spinner("Classifying..."):
+            label, confidence = predict_wafer(image)
+            if label == "Uncertain":
+                st.warning("Prediction uncertain. Try a clearer wafer map image.")
+            else:
+                st.success(f"**Prediction**: {label}")
+                st.write(f"**Confidence**: {confidence:.2%}")
+        # Debug: Log camera prediction
+        st.write("DEBUG: Camera prediction complete")
+    elif uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        if not is_valid_wafer_image(image):
+            st.warning("Image converted to grayscale, but ensure it’s a clear wafer map for best results.")
+        with st.spinner("Classifying..."):
+            label, confidence = predict_wafer(image)
+            if label == "Uncertain":
+                st.warning("Prediction uncertain. Try a clearer wafer map image.")
+            else:
+                st.success(f"**Prediction**: {label}")
+                st.write(f"**Confidence**: {confidence:.2%}")
+        # Debug: Log upload prediction
+        st.write("DEBUG: Upload prediction complete")
+    else:
+        st.info("Please capture a photo or upload an image to get started.")
+
+    st.write("**Note**: This model was trained on the WM-811K dataset. 'Pass' indicates no defect pattern, while 'Fail' indicates a defect.")
+    # Debug: Log UI complete
+    st.write("DEBUG: UI complete")
