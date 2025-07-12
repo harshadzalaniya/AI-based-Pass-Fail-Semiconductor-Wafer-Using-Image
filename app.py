@@ -24,15 +24,16 @@ def is_valid_wafer_image(image):
         # Check if image is nearly grayscale (R, G, B channels similar)
         r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
         color_diff = np.mean(np.abs(r - g)) + np.mean(np.abs(g - b))
-        return color_diff < 10  # Threshold for grayscale-like images
+        return color_diff < 20  # Relaxed threshold for grayscale-like images
     return len(img_array.shape) == 2  # Grayscale is valid
 
 def preprocess_image(image, img_size=(64, 64)):
-    img = np.array(image)
-    if len(img.shape) == 2:
-        img = np.stack([img] * 3, axis=-1)
-    elif img.shape[2] == 4:
-        img = img[:, :, :3]
+    # Convert to grayscale
+    img = image.convert('L')  # Convert to grayscale using PIL
+    img = np.array(img)
+    # Stack to 3 channels for model compatibility
+    img = np.stack([img] * 3, axis=-1)
+    # Resize and normalize
     img = cv2.resize(img, img_size, interpolation=cv2.INTER_NEAREST)
     img = img / 255.0
     img = np.expand_dims(img, axis=0)
@@ -49,7 +50,7 @@ def predict_wafer(image):
 
 st.title("Pass/Fail Semiconductor Wafer Classifier")
 st.write("Capture a wafer map image with your camera or upload one to classify it as Pass or Fail.")
-st.write("**Tip**: Use clear wafer map images (grayscale, defect patterns). Non-wafer images (e.g., human photos) may give unreliable results.")
+st.write("**Tip**: Use clear wafer map images (grayscale, defect patterns). Images are converted to grayscale for classification.")
 
 # Camera input
 camera_image = st.camera_input("Take a photo of the wafer map")
@@ -59,10 +60,9 @@ uploaded_file = st.file_uploader("Or upload a wafer map image...", type=["png", 
 if camera_image is not None:
     image = Image.open(camera_image)
     if not is_valid_wafer_image(image):
-        st.error("Invalid image! Please capture a wafer map (grayscale, defect pattern).")
-        st.stop()
-    st.image(image, caption="Camera-Captured Wafer Map", use_column_width=True)
-    st.write(f"Image shape: {np.array(image).shape}")
+        st.warning("Image converted to grayscale for processing, but ensure it’s a clear wafer map for best results.")
+    st.image(image.convert('L'), caption="Camera-Captured Wafer Map (Grayscale)", use_column_width=True)
+    st.write(f"Image shape: {np.array(image.convert('L')).shape}")
     with st.spinner("Classifying..."):
         label, confidence = predict_wafer(image)
         if label == "Uncertain":
@@ -73,10 +73,9 @@ if camera_image is not None:
 elif uploaded_file is not None:
     image = Image.open(uploaded_file)
     if not is_valid_wafer_image(image):
-        st.error("Invalid image! Please upload a wafer map (grayscale, defect pattern).")
-        st.stop()
-    st.image(image, caption="Uploaded Wafer Map", use_column_width=True)
-    st.write(f"Image shape: {np.array(image).shape}")
+        st.warning("Image converted to grayscale for processing, but ensure it’s a clear wafer map for best results.")
+    st.image(image.convert('L'), caption="Uploaded Wafer Map (Grayscale)", use_column_width=True)
+    st.write(f"Image shape: {np.array(image.convert('L')).shape}")
     with st.spinner("Classifying..."):
         label, confidence = predict_wafer(image)
         if label == "Uncertain":
