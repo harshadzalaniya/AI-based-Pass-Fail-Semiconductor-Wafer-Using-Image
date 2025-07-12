@@ -18,6 +18,15 @@ except Exception as e:
     st.error(f"Error loading model: {str(e)}")
     st.stop()
 
+def is_valid_wafer_image(image):
+    img_array = np.array(image)
+    if len(img_array.shape) == 3:
+        # Check if image is nearly grayscale (R, G, B channels similar)
+        r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
+        color_diff = np.mean(np.abs(r - g)) + np.mean(np.abs(g - b))
+        return color_diff < 10  # Threshold for grayscale-like images
+    return len(img_array.shape) == 2  # Grayscale is valid
+
 def preprocess_image(image, img_size=(64, 64)):
     img = np.array(image)
     if len(img.shape) == 2:
@@ -32,12 +41,15 @@ def preprocess_image(image, img_size=(64, 64)):
 def predict_wafer(image):
     processed_img = preprocess_image(image)
     prediction = model.predict(processed_img)[0][0]
+    if 0.2 < prediction < 0.8:  # Threshold for ambiguous predictions
+        return "Uncertain", 0.0
     label = "Pass" if prediction >= 0.5 else "Fail"
     confidence = prediction if label == "Pass" else 1 - prediction
     return label, confidence
 
 st.title("Pass/Fail Semiconductor Wafer Classifier")
 st.write("Capture a wafer map image with your camera or upload one to classify it as Pass or Fail.")
+st.write("**Tip**: Use clear wafer map images (grayscale, defect patterns). Non-wafer images (e.g., human photos) may give unreliable results.")
 
 # Camera input
 camera_image = st.camera_input("Take a photo of the wafer map")
@@ -46,18 +58,32 @@ uploaded_file = st.file_uploader("Or upload a wafer map image...", type=["png", 
 
 if camera_image is not None:
     image = Image.open(camera_image)
+    if not is_valid_wafer_image(image):
+        st.error("Invalid image! Please capture a wafer map (grayscale, defect pattern).")
+        st.stop()
     st.image(image, caption="Camera-Captured Wafer Map", use_column_width=True)
+    st.write(f"Image shape: {np.array(image).shape}")
     with st.spinner("Classifying..."):
         label, confidence = predict_wafer(image)
-        st.write(f"**Prediction**: {label}")
-        st.write(f"**Confidence**: {confidence:.2%}")
+        if label == "Uncertain":
+            st.warning("Prediction uncertain. Try a clearer wafer map image.")
+        else:
+            st.write(f"**Prediction**: {label}")
+            st.write(f"**Confidence**: {confidence:.2%}")
 elif uploaded_file is not None:
     image = Image.open(uploaded_file)
+    if not is_valid_wafer_image(image):
+        st.error("Invalid image! Please upload a wafer map (grayscale, defect pattern).")
+        st.stop()
     st.image(image, caption="Uploaded Wafer Map", use_column_width=True)
+    st.write(f"Image shape: {np.array(image).shape}")
     with st.spinner("Classifying..."):
         label, confidence = predict_wafer(image)
-        st.write(f"**Prediction**: {label}")
-        st.write(f"**Confidence**: {confidence:.2%}")
+        if label == "Uncertain":
+            st.warning("Prediction uncertain. Try a clearer wafer map image.")
+        else:
+            st.write(f"**Prediction**: {label}")
+            st.write(f"**Confidence**: {confidence:.2%}")
 else:
     st.info("Please capture a photo or upload an image to get started.")
 
